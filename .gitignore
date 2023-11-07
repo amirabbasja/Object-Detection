@@ -1,5 +1,2 @@
-data/labels/test/*
-data/labels/train/*
-data/images/test/*
-data/images/train/*
+data/
 README.md
