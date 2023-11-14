@@ -1,0 +1,1 @@
+This directory contains a simple object detection using YOLOv1 algrithm.
