@@ -49,7 +49,7 @@ def dispBBox(picDir, picName, labelDetail, labelsNames):
                     bbox = dict(facecolor='white', edgecolor='red', pad = 1), size = 7, backgroundcolor = "red"
                 )
     else:
-        # Dispaly the bounding boxes
+        # Display the bounding boxes
         for i in range(len(labelDetail["labels"][picName])):
             bBox = labelDetail["labels"][picName][i]["bounding_box"]
             # print(labelDetail["labels"][picName][i])
