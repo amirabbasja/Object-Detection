@@ -32,6 +32,7 @@ def outTensor_YOLOv1(imgPath, imgId, annots:pd.DataFrame, C, S = 7, B = 1, imgSi
     
     Returns:
         The image as a numpy array and a numpy array with the shape S x S x (B * 5 + C).
+        Note that the image numpy array is NOT normalized.
     """
 
     # Open the image
@@ -49,10 +50,10 @@ def outTensor_YOLOv1(imgPath, imgId, annots:pd.DataFrame, C, S = 7, B = 1, imgSi
     
     for _, row in annots.iterrows():
         # Get the absolute values for x,y,w and h
-        x = row.xCenter * 448
-        y = row.yCenter * 448
-        w = row.width * 448
-        h = row.height * 448
+        x = row.boxCenterX * 448
+        y = row.boxCenterY * 448
+        w = row.boxWidth * 448
+        h = row.boxHeight * 448
 
         # Get the x and y indexes of the grid cell
         cell_idx_i = int(x / 64) + 1
@@ -72,13 +73,11 @@ def outTensor_YOLOv1(imgPath, imgId, annots:pd.DataFrame, C, S = 7, B = 1, imgSi
         # Change the output matrix accordingly. The target tensor/matrix should have 
         # the following properties for each grid cell: (confidenceScore|xRel|yRel|w|h|classNo)
         # where the classNo is a one-hot encoded vector.
-        print(cell_idx_i-1,cell_idx_j-1, "added")
         out[cell_idx_i-1,cell_idx_j-1,:] = np.array([1, xRel, yRel, wRel, hRel,1])
     
     return np.array(img), np.array(out)
 
 
-df = handler.annotationsToDataframe("Object-Detection/data/labels/train","txt")
-imgPredTensor = outTensor_YOLOv1("Object-Detection/data/images/train/00a5820192213a93.jpg", "00a5820192213a93", df, 1, B = 1)
-# print(imageTensor[3,3,:])
-handler.dispBBox("Object-Detection/data/images/train", "00a5820192213a93", df, ["person"], gridCells=7, newSize=(448,448))
+# df = handler.annotationsToDataframe("Object-Detection/data/labels/train","txt", "00a5820192213a93")
+# img, imgPredTensor = outTensor_YOLOv1("Object-Detection/data/images/train/00a5820192213a93.jpg", "00a5820192213a93", df, 1, B = 1)
+# handler.dispBBox("Object-Detection/data/images/train", "00a5820192213a93", df, ["person"], newSize=(448,448))
