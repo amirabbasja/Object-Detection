@@ -5,9 +5,11 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg # Necessary for readig an image
 import matplotlib.patches as patches # Necessary for drawing bounding boxes
 import glob
+import os
 import json
 from pathlib import Path
 import pandas as pd
+import numpy as np
 from PIL import Image
 
 def dispBBox(picDir, picName, annotation, labelsNames, newSize = None, gridCells = None):
@@ -188,3 +190,169 @@ def annotationsToDataframe(annotDir, annotExt, annotId = None):
     )
 
     return df
+
+class dataGenerator_YOLOv1():
+    """
+    The dataGenerator class is used to help with the loading of training data to tensorflow model. 
+    Loading the entire dataset can be memory intensive. To solve this issue, only at the beginning of
+    each epoch the training data is loaded in predefined batches. As stated in tensorflow documentation, 
+    using this method guarantees that the network will only train once on each sample per epoch.
+
+    Also note that: Every Sequence must implement the __getitem__ and the __len__ methods. If you want 
+    to modify your dataset between epochs you may implement on_epoch_end. The method __getitem__ should
+    return a complete batch.
+
+    Ref: https://www.tensorflow.org/api_docs/python/tf/keras/utils/Sequence
+    """
+
+    def __init__(self, trainImgDir, batchSize, imgSize, annotDf, nClass, shuffle):
+        """
+        Initializes the object.
+
+        Args:
+            trainImgDir: str: The directory which contains the training data. Each file should be saved with
+            jpg extension. Also the imageId of each training sample should be the same as its file name. 
+                e.g. {imageId}.gpg
+            batchSize: int: The size of training samples in each batch. Preferably powers of two.
+            annotDf: pd.Dataframe: A pandas directory containing all of the annotations.
+            imgSize: tuple: A tuple containing training image size (width,height) in pixels. (448,448) for
+                YOLOv1.
+            nClass = int: Number of classes that are to be detected.
+            shuffle: bool: Weather to shuffle the data at the end of each epoch. 
+        """
+        self.trainDir = trainImgDir
+        self.imgSize = imgSize
+        self.batchSize = batchSize
+        self.annots = annotDf
+        self.nClass = nClass
+        self.shuffle = shuffle
+        self.indexes = np.array([])
+        self.lstImageId = [] # A list of entire training image ids
+
+        # Search the trainDir to acquire all the image IDs
+        __lst = os.listdir(trainImgDir)
+        __lst = [item for item in __lst if item.endswith(".jpg")]
+        __lst = [tmp.replace(".jpg", "") for tmp in __lst]
+        self.lstImageId = __lst
+
+        # Run once when object is created.
+        self.on_epoch_end()
+
+    def on_epoch_end(self):
+        """
+        Updates the indexes after each epoch. If self.shuffle == True, the training indexes will be shuffled.
+        """
+        self.indexes = np.arange(len(self.lstImageId))
+        if self.shuffle == True:
+            self.indexes = np.random.shuffle(self.indexes)
+
+    def __len__(self):
+        """
+        As stated in tensorflow documentation, should return the number of batches per epoch
+        """
+        return int(len(self.lstImageId) / self.batchSize)
+        
+    def __getitem__(self, idx):
+        """
+        This method generates batches. The right batch should be chosen by using the index argument.
+        The logic: self.indexes contains indexes from 0 to len(self.lstImageId) at the end of each 
+        epoch the index list may be shuffled. Using the index argument, tensorflow iterates through 
+        batches. We select the proper chunk of self.indexes using the index argument then we fill 
+        lstIDs with self.lstImageId items using the indexes we acquired.   
+        """
+        __indexes = self.indexes[self.batchSize * idx : self.batchSize * (idx+1)]
+        lstIDs = [self.lstImageId[i] for i in __indexes]
+
+        # Generate the batch
+        x,y = self.__generateBatch(lstIDs)
+        
+        return x,y
+
+    def __generateBatch(self, lstImg):
+        """
+        Generates a batch by iterating through a list of image IDs.
+
+        Args:
+            lstImg: list: A list of strings, containing image IDs.
+        
+        Returns:
+            A batch of training and ground truth data.
+        """
+        x = []
+        y = []
+
+        for id in lstImg:
+            img, tensor = self.__read(id)
+
+            x.append(img)
+            y.append(tensor)
+        
+        return np.array(x), np.array(y)
+
+
+    def __read(self, ID):
+        """
+        Read the images and generate the ground truth tensor from annotations.
+        First the image is read, resized and normalized, Then the annotations from the previously 
+        acquired dataframe is used to generate the ground truth tensor.
+        For YOLOv1 each image is divided to 7*7 grids and each grid cell has the following parameter
+        in (order is important): [confScore, relX, relY, width, height, <classes one-hot vector>].
+        where relX and relY define the center of the bounding box relative to the grid cell. width 
+        and height parameters define the width and height of the bounding box relative to the 
+        entire image (They are NOT relative to the bounding box to avoid acquiring numbers bigger 
+        than 1). 
+
+
+        Args: 
+            ID: str: ID of the image to read
+
+        Returns: 
+            Two numpy arrays, The normalized image and it's ground truth tensor compatible with YOLOv1 
+            architecture. 
+        """
+        imgDir =  f"{self.trainDir}/{ID}.jpg"
+
+        # Read, resize and normalize the image
+        img = Image.open(imgDir)
+        img = img.resize(self.imgSize)
+        img = np.array(img)/255.
+
+        # Generate the ground truth tensor
+        outTensor = np.zeros((7,7,1*5 + self.nClass))
+
+        # Get the relevant annotations
+        df = self.annots[self.annots.id == ID]
+        for _, row in df.iterrows():
+            # Get the absolute values for x,y,w and h
+            x = row.boxCenterX * 448
+            y = row.boxCenterY * 448
+            w = row.boxWidth * 448
+            h = row.boxHeight * 448
+
+            # Get the x and y indexes of the grid cell
+            cell_idx_i = int(x / 64) + 1
+            cell_idx_j = int(y / 64) + 1
+
+            # The top-left corner of the gridCell
+            x_a = (cell_idx_i-1) * 64
+            y_a = (cell_idx_j-1) * 64
+
+            # The relative coordinates of the bounding box to the gridcell's top-left
+            # corner except w and h which are relative to the entire image.
+            xRel = (x-x_a) / 64
+            yRel = (y-y_a) / 64
+            wRel = w / 448
+            hRel = h / 448
+
+            # Change the output matrix accordingly. The target tensor/matrix should have 
+            # the following properties for each grid cell: (confidenceScore|xRel|yRel|w|h|classNo)
+            # where the classNo is a one-hot encoded vector.
+            outTensor[cell_idx_i-1,cell_idx_j-1,:] = np.array([1, xRel, yRel, wRel, hRel,1])
+        
+        return img, outTensor
+        
+
+df = annotationsToDataframe("./Object-Detection/data/images/train", "txt")
+a = dataGenerator_YOLOv1("./Object-Detection/data/images/train", 8, (448,448), df, 1, False)
+x,y = a.__getitem__(0)
+print(x.shape, y.shape)
