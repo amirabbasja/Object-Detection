@@ -6,7 +6,7 @@ import matplotlib.image as mpimg # Necessary for readig an image
 import matplotlib.patches as patches # Necessary for drawing bounding boxes
 import glob
 import os
-import json
+import keras
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -176,7 +176,7 @@ def annotationsToDataframe(annotDir, annotExt, annotId = None):
                     __lstBoxHeight.append(float(annot[4]))
                     __lstClass.append(int(annot[0]))
         
-    elif annotExt.lower() == "txt":
+    elif annotExt.lower() == "xml":
         # ----TODO----
         pass
     else:
@@ -191,7 +191,7 @@ def annotationsToDataframe(annotDir, annotExt, annotId = None):
 
     return df
 
-class dataGenerator_YOLOv1():
+class dataGenerator_YOLOv1(keras.utils.Sequence):
     """
     The dataGenerator class is used to help with the loading of training data to tensorflow model. 
     Loading the entire dataset can be memory intensive. To solve this issue, only at the beginning of
@@ -244,7 +244,7 @@ class dataGenerator_YOLOv1():
         """
         self.indexes = np.arange(len(self.lstImageId))
         if self.shuffle == True:
-            self.indexes = np.random.shuffle(self.indexes)
+            np.random.shuffle(self.indexes)
 
     def __len__(self):
         """
@@ -265,7 +265,6 @@ class dataGenerator_YOLOv1():
 
         # Generate the batch
         x,y = self.__generateBatch(lstIDs)
-        
         return x,y
 
     def __generateBatch(self, lstImg):
@@ -322,6 +321,7 @@ class dataGenerator_YOLOv1():
 
         # Get the relevant annotations
         df = self.annots[self.annots.id == ID]
+
         for _, row in df.iterrows():
             # Get the absolute values for x,y,w and h
             x = row.boxCenterX * 448
@@ -352,7 +352,38 @@ class dataGenerator_YOLOv1():
         return img, outTensor
         
 
-df = annotationsToDataframe("./Object-Detection/data/images/train", "txt")
-a = dataGenerator_YOLOv1("./Object-Detection/data/images/train", 8, (448,448), df, 1, False)
+df = annotationsToDataframe("./Object-Detection/data/labels/train", "txt")
+a = dataGenerator_YOLOv1("./Object-Detection/data/images/train", 1, (448,448), df, 1, True)
 x,y = a.__getitem__(0)
-print(x.shape, y.shape)
+u = np.int16(x[0,:]*255)
+v = y[0,:]
+
+fig, ax = plt.subplots()
+ax.imshow(u)
+
+gridCells = (7,7)
+# Add the gridcells
+if gridCells != None:
+    # Adding the horizental lines
+    for i in range(gridCells[1]):
+        ax.plot([0, 448], [448*(i+1)/gridCells[1],448*(i+1)/gridCells[1]], color = "blue", linewidth = 2)
+
+    # Adding the vertical lines
+    for i in range(gridCells[0]):
+        ax.plot([448*(i+1)/gridCells[0],448*(i+1)/gridCells[0]], [0, 448], color = "blue", linewidth = 2)
+
+# print(v.shape)
+# print(v)
+for i in range(7):
+    for j in range(7):
+        print(v[i,j,:])
+        if v[i,j,0] != 0:
+            ax.scatter(i * 64 + v[i,j,1]*64, j * 64 + v[i,j,2]*64, c="red")
+            xC = i * 64 + v[i,j,1]*64
+            yC = j * 64 + v[i,j,2]*64
+            ww = 448 *  v[i,j,3]
+            hh = 448 *  v[i,j,4]
+            ax.add_patch(patches.Rectangle((xC - ww/2,yC - hh/2),ww,hh, fill = None, color = "red"))
+
+
+plt.show()
