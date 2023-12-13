@@ -43,3 +43,7 @@ This directory contains a simple object detection using YOLOv1 algorithm.
 18. Loss function: Add the formula from 23:00 in the video 
 
 Ref: https://www.youtube.com/watch?v=zgbPj4lSc58&list=PL1u-h-YIOL0sZJsku-vq7cUGbqDEeDK0a
+
+Other detailed explanations on the YOLOv1 structure and its implementation are referenced below.
+https://towardsdatascience.com/yolo-made-simple-interpreting-the-you-only-look-once-paper-55f72886ab73
+https://wikidocs.net/167699
