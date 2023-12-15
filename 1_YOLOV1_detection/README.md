@@ -30,6 +30,7 @@ This directory contains a simple object detection using YOLOv1 algorithm.
     h = h_rel * 448
 11. Conditional confidence score is calculated for both bounding boxes: c_hat_1 = c1 * p. Where p = max(p1,p2,...,p20) < 1. This parameter is based on the confidence of an object existing.
 12. When analyzing the prediction matrix for each cell, only the bounding box with the higher confidence score is kept.
+12. YOLO does not predict a class for every box, it predicts a class for each cell. But each cell is associated with two boxes, so those boxes will have the same predicted class, even though they may have different shapes and positions. 
 
 # The architecture
 13. The YOLOv1 architecture is inspired by the GoogleNet model.
