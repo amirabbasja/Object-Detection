@@ -352,8 +352,8 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
         return img, outTensor
         
 
-df = annotationsToDataframe("./Object-Detection/data/labels/train", "txt")
-a = dataGenerator_YOLOv1("./Object-Detection/data/images/train", 1, (448,448), df, 1, True)
+df = annotationsToDataframe(f"{os.getcwd()}/data/labels/train", "txt")
+a = dataGenerator_YOLOv1(f"{os.getcwd()}/data/images/train", 1, (448,448), df, 1, True)
 x,y = a.__getitem__(0)
 u = np.int16(x[0,:]*255)
 v = y[0,:]
