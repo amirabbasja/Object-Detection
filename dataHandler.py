@@ -301,6 +301,7 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
         entire image (They are NOT relative to the bounding box to avoid acquiring numbers bigger 
         than 1). 
 
+        #TODO Generalize it for multiple classes.
 
         Args: 
             ID: str: ID of the image to read
@@ -337,7 +338,7 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
             x_a = (cell_idx_i-1) * 64
             y_a = (cell_idx_j-1) * 64
 
-            # The relative coordinates of the bounding box to the gridcell's top-left
+            # The relative coordinates of the bounding box to the grid cell's top-left
             # corner except w and h which are relative to the entire image.
             xRel = (x-x_a) / 64
             yRel = (y-y_a) / 64
@@ -347,11 +348,11 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
             # Change the output matrix accordingly. The target tensor/matrix should have 
             # the following properties for each grid cell: (confidenceScore|xRel|yRel|w|h|classNo)
             # where the classNo is a one-hot encoded vector.
-            outTensor[cell_idx_i-1,cell_idx_j-1,:] = np.array([1, xRel, yRel, wRel, hRel,1])
+            outTensor[cell_idx_i-1,cell_idx_j-1,:] = np.array([1, 1, xRel, yRel, wRel, hRel])
         
         return img, outTensor
         
-
+"""
 df = annotationsToDataframe(f"{os.getcwd()}/data/labels/train", "txt")
 a = dataGenerator_YOLOv1(f"{os.getcwd()}/data/images/train", 1, (448,448), df, 1, True)
 x,y = a.__getitem__(0)
@@ -362,9 +363,9 @@ fig, ax = plt.subplots()
 ax.imshow(u)
 
 gridCells = (7,7)
-# Add the gridcells
+# Add the grid cells
 if gridCells != None:
-    # Adding the horizental lines
+    # Adding the horizontal lines
     for i in range(gridCells[1]):
         ax.plot([0, 448], [448*(i+1)/gridCells[1],448*(i+1)/gridCells[1]], color = "blue", linewidth = 2)
 
@@ -372,8 +373,6 @@ if gridCells != None:
     for i in range(gridCells[0]):
         ax.plot([448*(i+1)/gridCells[0],448*(i+1)/gridCells[0]], [0, 448], color = "blue", linewidth = 2)
 
-# print(v.shape)
-# print(v)
 for i in range(7):
     for j in range(7):
         print(v[i,j,:])
@@ -387,3 +386,4 @@ for i in range(7):
 
 
 plt.show()
+"""
