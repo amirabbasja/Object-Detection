@@ -117,9 +117,90 @@ def dispBBox(picDir, picName, annotation, labelsNames, newSize = None, gridCells
     plt.show()
     return None
 
+def generateGroundTruth_YOLOv1(annotDir, annotExt, params = (7, 7, 1, 1)):
+    """
+    Processes the train data to generate ground truth matrices for YOLOv1 Network.
+    Generates a dataFrame that contains two columns, namely, id and vector. "id" refers to the 
+    id of the training data. "vector" is the ground truth value for that specific image. It is a
+    Sx*Sy*(5*B + C) matrix where Sx and Sy demonstrate the number of grids in x and y axis of the
+    image, respectively. Furthermore, B and C are for the number of bounding boxes in a grid cell
+    and the number of categories that we are trying to identify.
+    The output vector architecture is as follows: When there is no object in the grid, all the 
+    vector parameters are zero. When there is an object in the grid cell in (i,j) grid location,
+    the matrix located at is as follows: Tensor[i,j, :] = np.array([confidence_score, class number,
+        relX, relY, width, height])
+
+    Note: We added "B" to the parameters to generalize this function. Because we are generating 
+        ground truth matrices, B is always equal to 1
+
+    Args:
+        annotDir: str: The directory containing annotations.
+        annotExt: str: The extensions of the annotations.
+        params: tuple: A tuple containing parameters (Sx, Sy, B, C)
+
+     Returns: 
+        A pandas dataFrame with one column: [vector]. ID of each image is noted as the row index. 
+            Each item in the vector column is a numpy array
+    """
+    __Sx = params[0]
+    __Sy = params[1]
+    __B  = params[2]
+    __C  = params[3]
+
+
+    __df = pd.DataFrame(columns = ["id","vector"])
+
+    if annotExt.lower() == "txt":
+        i = 0
+        # Read the files in the directory
+        files = glob.glob(f"{os.getcwd()}/{annotDir}/*.txt")
+        for file in files:
+            with open(file) as f:
+                id = Path(file).stem
+                # Generate the ground truth tensor
+                outTensor = np.zeros((__Sx,__Sy,__B*(4+1) + __C))
+
+                for annot in f.readlines():
+                    annot = annot.replace("\n","") # Replace newline character
+                    annot = annot.split(" ")
+
+                    x = np.float64(annot[1])* 448
+                    y = np.float64(annot[2])* 448
+                    w = np.float64(annot[3])* 448
+                    h = np.float64(annot[4])* 448
+
+                    # Get the x and y indexes of the grid cell
+                    cell_idx_i = int(x / 64) + 1
+                    cell_idx_j = int(y / 64) + 1
+
+                    # The top-left corner of the gridCell
+                    x_a = (cell_idx_i-1) * 64
+                    y_a = (cell_idx_j-1) * 64
+
+                    # The relative coordinates of the bounding box to the grid cell's top-left
+                    # corner except w and h which are relative to the entire image.
+                    xRel = (x-x_a) / 64
+                    yRel = (y-y_a) / 64
+                    wRel = w / 448
+                    hRel = h / 448
+
+                    # Change the output matrix accordingly. The target tensor/matrix should have 
+                    # the following properties for each grid cell: (confidenceScore|classNo|xRel|yRel|w|h)
+                    # where the classNo is a one-hot encoded vector.
+                    outTensor[cell_idx_i-1,cell_idx_j-1,:] = np.array([1, 1, xRel, yRel, wRel, hRel])
+                
+                # Add the ground truth value to the dataFrame
+                __df.loc[i,["id", "vector"]] = [id, outTensor]
+
+                # Increase the index
+                i += 1
+    
+    __df = __df.set_index("id")
+    return __df
+
 def annotationsToDataframe(annotDir, annotExt, annotId = None):
     """
-    Reads the annotations from a directory and returns a dataframe. Annotations can be saved
+    Reads the annotations from a directory and returns a dataFrame. Annotations can be saved
     in two formats: TXT or XLS. 
         TXT: The annotations saved in text files should contain a single detection in each 
         line. Every line should be in the following order: [className rel_x rel_y width height].
@@ -132,16 +213,16 @@ def annotationsToDataframe(annotDir, annotExt, annotId = None):
     Args:
         annotDir: str: The directory containing annotations.
         annotExt: str: The extensions of the annotations.
-        annotId: str: The id of the specific image. If you want the returned dataframe to contain only 
+        annotId: str: The id of the specific image. If you want the returned dataFrame to contain only 
             the annotations for a specific image. If None, the entire annotation directory will 
-            be read and returned as a dataframe.
+            be read and returned as a dataFrame.
 
      Returns: 
-        A pandas dataframe with columns: [id, boxCenterX, boxCenterY, boxWidth, boxHeight, objClass]       
+        A pandas dataFrame with columns: [id, boxCenterX, boxCenterY, boxWidth, boxHeight, objClass]       
     """
     # For performance purposes, we wont use append/concat row methods for each new entry. We append 
-    # new data to lists as we iterate through the annotations. At the end we make a dataframe with 
-    # the lists in hand.Temprorary lists for appending the new data.
+    # new data to lists as we iterate through the annotations. At the end we make a dataFrame with 
+    # the lists in hand.Temporary lists for appending the new data.
     __lstID = []
     __lstBoxCenterX = []
     __lstBoxCenterY = []
@@ -185,8 +266,8 @@ def annotationsToDataframe(annotDir, annotExt, annotId = None):
     
     # Merge the lists to make a dataframe
     df = pd.DataFrame(
-        list(zip(__lstID, __lstBoxCenterX, __lstBoxCenterY, __lstBoxWidth, __lstBoxHeight, __lstClass)),
-        columns = ["id", "boxCenterX", "boxCenterY", "boxWidth", "boxHeight", "objClass"]   
+        list(zip(__lstID, __lstClass, __lstBoxCenterX, __lstBoxCenterY, __lstBoxWidth, __lstBoxHeight)),
+        columns = ["id", "objClass", "boxCenterX", "boxCenterY", "boxWidth", "boxHeight"]   
     )
 
     return df
@@ -281,7 +362,7 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
         y = []
 
         for id in lstImg:
-            img, tensor = self.__read(id)
+            img, tensor = self._read(id)
 
             x.append(img)
             y.append(tensor)
@@ -289,13 +370,13 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
         return np.array(x), np.array(y)
 
 
-    def __read(self, ID):
+    def _read(self, ID):
         """
         Read the images and generate the ground truth tensor from annotations.
         First the image is read, resized and normalized, Then the annotations from the previously 
         acquired dataframe is used to generate the ground truth tensor.
         For YOLOv1 each image is divided to 7*7 grids and each grid cell has the following parameter
-        in (order is important): [confScore, relX, relY, width, height, <classes one-hot vector>].
+        in (order is important): [confScore,  <classes one-hot vector>, relX, relY, width, height].
         where relX and relY define the center of the bounding box relative to the grid cell. width 
         and height parameters define the width and height of the bounding box relative to the 
         entire image (They are NOT relative to the bounding box to avoid acquiring numbers bigger 
@@ -346,7 +427,7 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
             hRel = h / 448
 
             # Change the output matrix accordingly. The target tensor/matrix should have 
-            # the following properties for each grid cell: (confidenceScore|xRel|yRel|w|h|classNo)
+            # the following properties for each grid cell: (confidenceScore|classNo|xRel|yRel|w|h)
             # where the classNo is a one-hot encoded vector.
             outTensor[cell_idx_i-1,cell_idx_j-1,:] = np.array([1, 1, xRel, yRel, wRel, hRel])
         
