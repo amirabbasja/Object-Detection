@@ -6,6 +6,7 @@ import matplotlib.image as mpimg # Necessary for readig an image
 import matplotlib.patches as patches # Necessary for drawing bounding boxes
 import glob
 import os
+import tensorflow as tf
 import keras
 from pathlib import Path
 import pandas as pd
@@ -127,7 +128,7 @@ def generateGroundTruth_YOLOv1(annotDir, annotExt, params = (7, 7, 1, 1)):
     and the number of categories that we are trying to identify.
     The output vector architecture is as follows: When there is no object in the grid, all the 
     vector parameters are zero. When there is an object in the grid cell in (i,j) grid location,
-    the matrix located at is as follows: Tensor[i,j, :] = np.array([confidence_score, class number,
+    the matrix located at is as follows: Tensor[i,j, :] = np.array([class number, confidence_score, 
         relX, relY, width, height])
 
     Note: We added "B" to the parameters to generalize this function. Because we are generating 
@@ -138,7 +139,7 @@ def generateGroundTruth_YOLOv1(annotDir, annotExt, params = (7, 7, 1, 1)):
         annotExt: str: The extensions of the annotations.
         params: tuple: A tuple containing parameters (Sx, Sy, B, C)
 
-     Returns: 
+    Returns: 
         A pandas dataFrame with one column: [vector]. ID of each image is noted as the row index. 
             Each item in the vector column is a numpy array
     """
@@ -185,7 +186,7 @@ def generateGroundTruth_YOLOv1(annotDir, annotExt, params = (7, 7, 1, 1)):
                     hRel = h / 448
 
                     # Change the output matrix accordingly. The target tensor/matrix should have 
-                    # the following properties for each grid cell: (confidenceScore|classNo|xRel|yRel|w|h)
+                    # the following properties for each grid cell: (classNo|confidenceScore|xRel|yRel|w|h)
                     # where the classNo is a one-hot encoded vector.
                     outTensor[cell_idx_i-1,cell_idx_j-1,:] = np.array([1, 1, xRel, yRel, wRel, hRel])
                 
@@ -233,29 +234,32 @@ def annotationsToDataframe(annotDir, annotExt, annotId = None):
     if annotExt.lower() == "txt":
         # Read the files in the directory
         files = glob.glob(f"{annotDir}/*.txt")
-        for file in files:
+        if len(files) == 0:
+            raise Exception("No annotations found in the passed directory")
+        else:
+            for file in files:
 
-            # GEt the annotation ID which is the file name
-            __fName = Path(file).stem
-            
-            # Only get a specific annotation. IF else, get all the annotations.
-            if annotId != None:
-                if __fName != annotId:
-                    continue
-
-            with open(file) as f:
+                # GEt the annotation ID which is the file name
+                __fName = Path(file).stem
                 
-                for annot in f.readlines():
-                    annot = annot.replace("\n","") # Replace newline character
-                    annot = annot.split(" ")
+                # Only get a specific annotation. IF else, get all the annotations.
+                if annotId != None:
+                    if __fName != annotId:
+                        continue
 
-                    # Append the new data
-                    __lstID.append(__fName)
-                    __lstBoxCenterX.append(float(annot[1]))
-                    __lstBoxCenterY.append(float(annot[2]))
-                    __lstBoxWidth.append(float(annot[3]))
-                    __lstBoxHeight.append(float(annot[4]))
-                    __lstClass.append(int(annot[0]))
+                with open(file) as f:
+                    
+                    for annot in f.readlines():
+                        annot = annot.replace("\n","") # Replace newline character
+                        annot = annot.split(" ")
+
+                        # Append the new data
+                        __lstID.append(__fName)
+                        __lstBoxCenterX.append(float(annot[1]))
+                        __lstBoxCenterY.append(float(annot[2]))
+                        __lstBoxWidth.append(float(annot[3]))
+                        __lstBoxHeight.append(float(annot[4]))
+                        __lstClass.append(int(annot[0]))
         
     elif annotExt.lower() == "xml":
         # ----TODO----
@@ -295,7 +299,7 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
             jpg extension. Also the imageId of each training sample should be the same as its file name. 
                 e.g. {imageId}.gpg
             batchSize: int: The size of training samples in each batch. Preferably powers of two.
-            annotDf: pd.Dataframe: A pandas directory containing all of the annotations.
+            annotDf: pd.DataFrame: A pandas dataframe containing all of the annotations.
             imgSize: tuple: A tuple containing training image size (width,height) in pixels. (448,448) for
                 YOLOv1.
             nClass = int: Number of classes that are to be detected.
@@ -366,7 +370,7 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
 
             x.append(img)
             y.append(tensor)
-        
+
         return np.array(x), np.array(y)
 
 
@@ -374,9 +378,9 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
         """
         Read the images and generate the ground truth tensor from annotations.
         First the image is read, resized and normalized, Then the annotations from the previously 
-        acquired dataframe is used to generate the ground truth tensor.
+        acquired dataFrame is used to generate the ground truth tensor.
         For YOLOv1 each image is divided to 7*7 grids and each grid cell has the following parameter
-        in (order is important): [confScore,  <classes one-hot vector>, relX, relY, width, height].
+        in (order is important): [<classes one-hot vector>, confScore, relX, relY, width, height].
         where relX and relY define the center of the bounding box relative to the grid cell. width 
         and height parameters define the width and height of the bounding box relative to the 
         entire image (They are NOT relative to the bounding box to avoid acquiring numbers bigger 
@@ -427,7 +431,7 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
             hRel = h / 448
 
             # Change the output matrix accordingly. The target tensor/matrix should have 
-            # the following properties for each grid cell: (confidenceScore|classNo|xRel|yRel|w|h)
+            # the following properties for each grid cell: (classNo|confidenceScore|xRel|yRel|w|h)
             # where the classNo is a one-hot encoded vector.
             outTensor[cell_idx_i-1,cell_idx_j-1,:] = np.array([1, 1, xRel, yRel, wRel, hRel])
         
