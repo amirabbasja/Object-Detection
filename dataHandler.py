@@ -24,9 +24,9 @@ def dispBBox(picDir, picName, annotation, labelsNames, newSize = None, gridCells
             The bounding box is formatted as follows: [<top-left-x>, <top-left-y>, <width>, <height>]
             where the bounding box coordinates are expressed as relative values in [0, 1] x [0, 1].
         annotation: str: The location of the textfile containing the bounding box and labels for each
-            detection. Each detection should be written in a seperate line containig 5 numbers with 
+            detection. Each detection should be written in a separate line containing 5 numbers with 
             the following numbers [labelNo. boxCenterX boxCenterY boxWidth boxHeight]
-        annotation: pd.Dataframe: A pandas dataframe containing an annotation in each row. Preferably 
+        annotation: pd.DataFrame: A pandas DataFrame containing an annotation in each row. Preferably 
             it should be returned from annotationsToDataframe method.
         labelsNames: list: A list of the labels used in detections process
         newSize: tuple: Weather to resize the image. A tuple (newWidth,newHeight) in pixels.
@@ -71,7 +71,7 @@ def dispBBox(picDir, picName, annotation, labelsNames, newSize = None, gridCells
         # JSON files
         # Note that the bounding box parameters when importing from a JSON file are relative to the 
         # entire image and the x and y should represent the coordinates of the top-left of the bounding box.
-        # The JSON file is output of fiftyone library.
+        # The JSON file is output of Fiftyone library.
 
         for i in range(len(annotation["labels"][picName])):
             bBox = annotation["labels"][picName][i]["bounding_box"]
@@ -83,8 +83,8 @@ def dispBBox(picDir, picName, annotation, labelsNames, newSize = None, gridCells
                 bbox = dict(facecolor='white', edgecolor='red', pad = 1), size = 7, backgroundcolor = "red"
             )
     elif type(annotation) == pd.DataFrame:
-        # Pandas dataframe
-        # Note that the bounding box parameters when importing from a pandas dataframe are relative to the 
+        # Pandas dataFrame
+        # Note that the bounding box parameters when importing from a pandas dataFrame are relative to the 
         # entire image and the x and y should represent the coordinates of the center of the bounding box
         
         df = annotation[annotation.id == picName]
@@ -100,7 +100,7 @@ def dispBBox(picDir, picName, annotation, labelsNames, newSize = None, gridCells
     
     # Add the gridcells
     if gridCells != None:
-        # Adding the horizental lines
+        # Adding the horizontal lines
         for i in range(gridCells[1]):
             ax.plot([0, width], [height*(i+1)/gridCells[1],height*(i+1)/gridCells[1]], color = "blue", linewidth = 2)
 
@@ -299,7 +299,7 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
             jpg extension. Also the imageId of each training sample should be the same as its file name. 
                 e.g. {imageId}.gpg
             batchSize: int: The size of training samples in each batch. Preferably powers of two.
-            annotDf: pd.DataFrame: A pandas dataframe containing all of the annotations.
+            annotDf: pd.DataFrame: A pandas dataFrame containing all of the annotations.
             imgSize: tuple: A tuple containing training image size (width,height) in pixels. (448,448) for
                 YOLOv1.
             nClass = int: Number of classes that are to be detected.
@@ -438,7 +438,7 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
         return img, outTensor
         
 """
-For testing the methods written here
+# For testing the methods written here
 df = annotationsToDataframe(f"{os.getcwd()}/data/labels/train", "txt")
 a = dataGenerator_YOLOv1(f"{os.getcwd()}/data/images/train", 1, (448,448), df, 1, True)
 x,y = a.__getitem__(0)
