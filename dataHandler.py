@@ -1,5 +1,5 @@
 """
-Contains the necessary function for handeling the train, test and cross-validation datasets.
+Contains the necessary function for handling the train, test and cross-validation datasets.
 """
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg # Necessary for readig an image
@@ -218,7 +218,7 @@ def annotationsToDataframe(annotDir, annotExt, annotId = None):
             the annotations for a specific image. If None, the entire annotation directory will 
             be read and returned as a dataFrame.
 
-     Returns: 
+    Returns: 
         A pandas dataFrame with columns: [id, boxCenterX, boxCenterY, boxWidth, boxHeight, objClass]       
     """
     # For performance purposes, we wont use append/concat row methods for each new entry. We append 
@@ -438,6 +438,7 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
         return img, outTensor
         
 """
+For testing the methods written here
 df = annotationsToDataframe(f"{os.getcwd()}/data/labels/train", "txt")
 a = dataGenerator_YOLOv1(f"{os.getcwd()}/data/images/train", 1, (448,448), df, 1, True)
 x,y = a.__getitem__(0)
