@@ -8,76 +8,86 @@ sys.path.append(parent)
 import numpy as np
 from  PIL import Image
 import pandas as pd
-import path
 import tensorflow as tf
 import dataHandler as handler
 
-def outTensor_YOLOv1(imgPath, imgId, annots:pd.DataFrame, C, S = 7, B = 1, imgSize = (448,448)):
+
+def iouUtils(boxParams, gridRatio = tf.constant(7, tf.float32)):
     """
-    Segments the input image and outputs the matrix used for training the network.
+    Given bounding box centers and its width and height, calculates top-left and bottom-right coordinates of the box.
+    Note that calculations in this function are done with teh assumption of w and h being a float number, between 0 and 1
+    with respect to the entire image's size. However, x and y of the bounding box's center are assumed to be a float 
+    between 0 and 1, with respect to the upper-left point of the grid cell.
 
     Args:
-        imgPath: str: The path for the image
-        imgId: str: The target image's id that also exists in the annotations dataframe.
-        annots: pd.Dataframe: The annotations containing the bounding boxes and.
-            labels. It is encouraged that the dataframe only contain the required image's
-            annotations.
-        C: int: Number of classes.
-        S: int: Number of the parts that each side of the image should be divided to.
-            S = 7 for YOPath1.
-        B: int: Number of the bounding boxes per grid. B = 2 for YOLOv1 predictions and 
-            B = 1 for generating target tensors for learning.
-        imgSize: tuple: The width and height of the image. Pass "None" to avoid 
-            resizing the input image. The images in YOLOv1 have the shape 448x448 
+        boxParams: tf.Tensor: A tensor with following information (Box center X, Box center Y, Box width, Box height) for all
+            boxes in a tensor.
+        gridRatio: int: The number of evenly distributed grid cells in each image axis. Use 7 for YOLOv1.
     
     Returns:
-        The image as a numpy array and a numpy array with the shape S x S x (B * 5 + C).
-        Note that the image numpy array is NOT normalized.
+        Two tensors, one indicating top-left pint of the bBox and, the other one denoting bottom-right edge.
+    """
+    boxXY = boxParams[...,0:2]
+    halfWH = tf.divide(boxParams[...,2:], tf.constant([2.]))
+
+    # Top-left (X, Y) and bottom-right (X, Y)
+    return tf.subtract(boxXY, halfWH * gridRatio), tf.add(boxXY, halfWH * gridRatio)
+
+def calcIOU(predict_topLeft, predict_bottomRight, truth_topLeft, truth_bottomRight):
+    """
+    Calculates intersection over union for two bounding boxes.
+
+    Args:
+        predict_topLeft, predict_bottomRight: tf.Tensor: Top-left and bottom-right coordinates of the predicted box, acquired 
+            by iouUtils.
+        truth_topLeft, truth_bottomRight: tf.Tensor: Top-left and bottom-right coordinates of the ground truth box, acquired 
+            by iouUtils.
+    
+    Returns:
+        Intersection over union of two boxes
     """
 
-    # Open the image
-    img = Image.open(imgPath)
-
-    # Resize the image if necessary
-    if imgSize != None:
-        img = img.resize(imgSize)
-
-    # Instantiate the output tensor
-    out = np.zeros((S,S,B*5+C))
-
-    # In case if the provided dataframe contains more than required data
-    annots = annots[annots.id == imgId]
+    intersectEdgeLeft = tf.maximum(predict_topLeft, truth_topLeft)
+    intersectEdgeRight = tf.minimum(predict_bottomRight, truth_bottomRight)
     
-    for _, row in annots.iterrows():
-        # Get the absolute values for x,y,w and h
-        x = row.boxCenterX * 448
-        y = row.boxCenterY * 448
-        w = row.boxWidth * 448
-        h = row.boxHeight * 448
+    intersectWH = tf.abs(tf.subtract(intersectEdgeLeft, intersectEdgeRight))
+    intersectArea = tf.reduce_prod(intersectWH, axis = -1)
 
-        # Get the x and y indexes of the grid cell
-        cell_idx_i = int(x / 64) + 1
-        cell_idx_j = int(y / 64) + 1
+    # Get area of predicted and ground truth bounding boxes
+    predArea = tf.reduce_prod(tf.abs(tf.subtract(predict_topLeft, predict_bottomRight)), axis = -1)
+    truthArea = tf.reduce_prod(tf.abs(tf.subtract(truth_topLeft, truth_bottomRight)), axis = -1)
 
-        # The top-left corner of the gridCell
-        x_a = (cell_idx_i-1) * 64
-        y_a = (cell_idx_j-1) * 64
-
-        # The relative coordinates of the bounding box to the gridcell's top-left
-        # corner except w and h which are relative to the entire image.
-        xRel = (x-x_a) / 64
-        yRel = (y-y_a) / 64
-        wRel = w / 448
-        hRel = h / 448
-
-        # Change the output matrix accordingly. The target tensor/matrix should have 
-        # the following properties for each grid cell: (confidenceScore|xRel|yRel|w|h|classNo)
-        # where the classNo is a one-hot encoded vector.
-        out[cell_idx_i-1,cell_idx_j-1,:] = np.array([1, xRel, yRel, wRel, hRel,1])
     
-    return np.array(img), np.array(out)
+    # Return IOU
+    return tf.divide(intersectArea, predArea + truthArea - intersectArea)
+
+def lrScheduler(epoch, schedule, currentLR):
+    """
+    Returns a learning rate value with respect to epoch number.
+
+    Args: 
+        epoch: int: the current epoch number.
+        schedule: list: A list of tuples of epoch number and its respective learning rate value. 
+            If the epoch number of the fitting process doesn't reach the specified epoch number,
+            the learning rate will remail unchanged. The entries have to be in order of epoch 
+            numbers.
+        currentLR: float: The learning rate of the model before starting the most recent epoch.
+
+    Returns: float: learning rate.
+    """
+    
+    newLR = currentLR
+
+    for entry in schedule:
+        if entry[0] == epoch:
+            newLR = float(entry[1])
+    
+    return newLR
 
 
-# df = handler.annotationsToDataframe("Object-Detection/data/labels/train","txt", "00a5820192213a93")
-# img, imgPredTensor = outTensor_YOLOv1("Object-Detection/data/images/train/00a5820192213a93.jpg", "00a5820192213a93", df, 1, B = 1)
-# handler.dispBBox("Object-Detection/data/images/train", "00a5820192213a93", df, ["person"], newSize=(448,448))
+# #  Testing IOU code
+# predict = tf.random.uniform((3,4))
+# truth = tf.random.uniform((3,4))
+# p1, p2 = iouUtils(predict)
+# t1, t2 = iouUtils(truth)
+# print(calcIOU(p1, p2, t1, t2))
