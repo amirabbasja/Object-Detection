@@ -305,6 +305,8 @@ class dataGenerator_YOLOv1(keras.utils.Sequence):
             nClass = int: Number of classes that are to be detected.
             shuffle: bool: Weather to shuffle the data at the end of each epoch. 
         """
+        super().__init__()
+        
         self.trainDir = trainImgDir
         self.imgSize = imgSize
         self.batchSize = batchSize
