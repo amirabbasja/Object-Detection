@@ -1,3 +1,5 @@
+# training the network
+# To check the GPU status use (if you have a NVIDIA GPU): watch -n 1 nvidia-smi
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint # type: ignore
@@ -33,7 +35,7 @@ if __name__ == "__main__":
 
     # Training variables
     numEpochs = 135
-    batch_size = 4
+    batch_size = 1
     LR_schedule = [(0, 0.01),(75, 0.001),(105, 0.0001),]
 
     dfTrain = annotationsToDataframe(f"../data/labels/train", "txt")
@@ -45,10 +47,10 @@ if __name__ == "__main__":
     model = YOLOV1_Model().getModel()
 
     model.fit(x=trainingBatchGenerator,
-            steps_per_epoch = int(dfTrain.shape[0] // batch_size),
+            # steps_per_epoch = int(dfTrain.shape[0] // batch_size),
             epochs = numEpochs,
             verbose = 1,
             validation_data = testingBatchGenerator,
-            validation_steps = int(len(dfTest) // batch_size),
+            # validation_steps = int(len(dfTest) // batch_size),
             callbacks = [customLearningRate(lrScheduler, LR_schedule),chkPoint]
     )
