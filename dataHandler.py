@@ -1,17 +1,17 @@
 """
 Contains the necessary function for handling the train, test and cross-validation datasets.
-"""
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg # Necessary for readig an image
-import matplotlib.patches as patches # Necessary for drawing bounding boxes
+""" 
+import matplotlib.pyplot as plt  # type: ignore
+import matplotlib.image as mpimg # Necessary for readig an image  # type: ignore
+import matplotlib.patches as patches # Necessary for drawing bounding boxes  # type: ignore
 import glob
 import os
-import tensorflow as tf
-import keras
-from pathlib import Path
-import pandas as pd
-import numpy as np
-from PIL import Image
+import tensorflow as tf # type: ignore
+import keras # type: ignore
+from pathlib import Path # type: ignore
+import pandas as pd # type: ignore
+import numpy as np # type: ignore
+from PIL import Image # type: ignore
 
 def dispBBox(picDir, picName, annotation, labelsNames, newSize = None, gridCells = None):
     """
