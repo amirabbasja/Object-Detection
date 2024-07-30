@@ -11,6 +11,34 @@ import pandas as pd
 import tensorflow as tf
 import dataHandler as handler
 
+def customSQRT(tensor):
+    """
+    Returns element-wise square root of the tensor. Only can be used for tensors that all its 
+    elements are smaller than 1. We use taylor series of sqrt(1-x) = 1 - x/2 - x^2/8 - x^3/16
+    to do the calculations
+    
+    Args: tensor: tf.Tensor: A tensorflow tensor (All elements should be smaller than 1)
+    """
+    __x = tf.subtract(1., tensor)
+    
+    return  1. - tf.divide(__x, 2.) - tf.divide(tf.pow(__x, 2),8.) - tf.divide(tf.pow(__x, 3),16.) \
+        - tf.multiply(tf.divide(tf.pow(__x, 4),128.),5) - tf.multiply(tf.divide(tf.pow(__x, 5),256.),7)\
+        - tf.multiply(tf.divide(tf.pow(__x, 6),1024.),21)
+
+def customSQRT2(tensor):
+    """
+    Returns element-wise square root of the tensor. Only can be used for tensors that all its 
+    elements are smaller than 1. We use taylor series of sqrt(0.5-x) which has been acquired
+    using Wolfram Alpha through the following link:
+    https://www.wolframalpha.com/widgets/view.jsp?id=f9476968629e1163bd4a3ba839d60925
+    
+    Args: tensor: tf.Tensor: A tensorflow tensor (All elements should be smaller than 1)
+    """
+    __x = tf.subtract(0.5, tensor)
+    
+    return  0.707107 - tf.multiply(0.707107, __x) - tf.multiply(0.353553, tf.pow(__x, 2)) - tf.multiply(0.353553, tf.pow(__x, 3)) \
+        - tf.multiply(0.441942, tf.pow(__x, 4)) - tf.multiply(0.618718, tf.pow(__x, 5)) + tf.multiply(0.928078, tf.pow(__x, 6)) \
+        - tf.multiply(1.45841, tf.pow(__x, 7)) - tf.multiply(2.36991, tf.pow(__x, 8)) - tf.multiply(3.94985, tf.pow(__x, 9))   
 
 def iouUtils(boxParams, gridRatio = tf.constant(7, tf.float32)):
     """

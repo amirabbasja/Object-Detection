@@ -27,30 +27,36 @@ if __name__ == "__main__":
         os.mkdir(f"{os.getcwd()}/model_data")
 
     # Instantiate the checkpoint object
-    chkPoint = ModelCheckpoint(filepath='./model_data/model_{epoch:02d}-{val_loss:.2f}.keras',save_best_only=True,monitor='val_loss',mode='min',verbose=1)
+    chkPoint = ModelCheckpoint(filepath='./model_data/model_{epoch:02d}-{val_loss:.2f}.keras',
+                                        save_best_only=True,
+                                        monitor='val_loss',
+                                        mode='min',
+                                        verbose=1
+                                )
 
-    # YOLOv1 specific parameters
-    imageShape = (448,448)
-    numClasses = 1
-
-    # Training variables
-    numEpochs = 135
     batch_size = 1
-    LR_schedule = [(0, 0.01),(75, 0.001),(105, 0.0001),]
+    LR_schedule = [
+        (0, 0.01),
+        (75, 0.001),
+        (105, 0.0001),
+    ]
 
     dfTrain = annotationsToDataframe(f"../data/labels/train", "txt")
-    trainingBatchGenerator = dataGenerator_YOLOv1(f"../data/images/train", batch_size, imageShape, dfTrain, numClasses, True)
+    trainingBatchGenerator = dataGenerator_YOLOv1(f"../data/images/train", batch_size, (448,448), dfTrain, 1, True)
 
     dfTest = annotationsToDataframe(f"../data/labels/test", "txt")
-    testingBatchGenerator = dataGenerator_YOLOv1(f"../data/images/test", batch_size, imageShape, dfTrain, numClasses, True)
+    testingBatchGenerator = dataGenerator_YOLOv1(f"../data/images/test", batch_size, (448,448), dfTrain, 1, True)
 
     model = YOLOV1_Model().getModel()
 
     model.fit(x=trainingBatchGenerator,
-            # steps_per_epoch = int(dfTrain.shape[0] // batch_size),
-            epochs = numEpochs,
+            steps_per_epoch = int(trainingBatchGenerator.indexes.shape[0] // batch_size),
+            epochs = 135,
             verbose = 1,
             validation_data = testingBatchGenerator,
-            # validation_steps = int(len(dfTest) // batch_size),
-            callbacks = [customLearningRate(lrScheduler, LR_schedule),chkPoint]
+            validation_steps = int(testingBatchGenerator.indexes.shape[0] // batch_size),
+            callbacks = [
+                customLearningRate(lrScheduler, LR_schedule),
+                chkPoint,
+            ]
     )

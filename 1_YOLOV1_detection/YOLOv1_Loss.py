@@ -1,6 +1,6 @@
 # YOLOv1 Loss
 import tensorflow as tf
-from utils import iouUtils, calcIOU
+from utils import iouUtils, calcIOU, customSQRT2
 
 def YOLOv1_loss(yTrue, yPred):
     """
@@ -71,7 +71,7 @@ def YOLOv1_loss(yTrue, yPred):
     # 3. Localization loss
     # Bear in mind that respBox is of the shape (...,5) and targetCoords dimension is (...,4) 
     xyLoss = (tf.reduce_sum(tf.square(tf.subtract(respBox[...,1:3], targetCoords[...,0:2])),-1,True))
-    whLoss = (tf.reduce_sum(tf.square(tf.subtract(tf.sqrt(respBox[...,1:3]), tf.sqrt(targetCoords[...,0:2]))),-1,True))
+    whLoss = (tf.reduce_sum(tf.square(tf.subtract(customSQRT2(respBox[...,1:3]), customSQRT2(targetCoords[...,0:2]))),-1,True))
     localizationLoss = lambdaCoord * (xyLoss + whLoss) 
 
     # Sum all the tree types of the errors
