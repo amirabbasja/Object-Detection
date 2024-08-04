@@ -1,6 +1,6 @@
 # YOLOv1 Loss
 import tensorflow as tf
-from utils import iouUtils, calcIOU, customSQRT2
+from utils import iouUtils, calcIOU, customSQRT3
 
 def YOLOv1_loss(yTrue, yPred):
     """
@@ -49,13 +49,17 @@ def YOLOv1_loss(yTrue, yPred):
     maskObj = tf.cast(0 < targetConf, tf.float32)
     maskNoObj = tf.cast(0 == targetConf, tf.float32)
     
+    # Get mask tensors for boxes that their first prediction has higher IOU
     mask_p1Bigger = tf.expand_dims(tf.cast(p2_IOU < p1_IOU, tf.float32),-1)
+    
+    # Get mask tensors for boxes that their second prediction has higher IOU
     mask_p2Bigger = tf.expand_dims(tf.cast(p1_IOU <= p2_IOU, tf.float32),-1)
 
-    # Getting the responsible bounding box for loss calculation. Output is of shape [...,5]
-    # And the first element is the confidence score of that box.
+    # Getting the responsible bounding box for loss calculation. 
+    # Output is of shape [...,5] because we disregard the bounding box with smaller IOU
+    # The first element is the confidence score of that box.
     respBox = maskObj*(mask_p1Bigger * predBox1 + mask_p2Bigger * predBox2)
-
+    
     # Calculating the losses
     # 1. Classification loss
     classificationLoss =  tf.math.reduce_sum(tf.math.square(maskObj * tf.subtract(targetClass, predClass)))
@@ -70,10 +74,10 @@ def YOLOv1_loss(yTrue, yPred):
     
     # 3. Localization loss
     # Bear in mind that respBox is of the shape (...,5) and targetCoords dimension is (...,4) 
-    xyLoss = (tf.reduce_sum(tf.square(tf.subtract(respBox[...,1:3], targetCoords[...,0:2])),-1,True))
-    whLoss = (tf.reduce_sum(tf.square(tf.subtract(customSQRT2(respBox[...,1:3]), customSQRT2(targetCoords[...,0:2]))),-1,True))
-    localizationLoss = lambdaCoord * (xyLoss + whLoss) 
-
+    xyLoss = tf.reduce_sum(tf.square(tf.subtract(respBox[...,1:3], targetCoords[...,0:2])),-1,True)
+    whLoss = tf.reduce_sum(tf.square(tf.subtract(customSQRT3(respBox[...,3:5], respBox[...,3:5], 10), customSQRT3(targetCoords[...,2:4], targetCoords[...,2:4], 10))),-1,True)
+    localizationLoss = tf.reduce_sum(lambdaCoord * (xyLoss + whLoss) )
+    
     # Sum all the tree types of the errors
     return classificationLoss + confidenceLossNoObj + confidenceLossObj + localizationLoss
 
