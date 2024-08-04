@@ -40,6 +40,24 @@ def customSQRT2(tensor):
         - tf.multiply(0.441942, tf.pow(__x, 4)) - tf.multiply(0.618718, tf.pow(__x, 5)) + tf.multiply(0.928078, tf.pow(__x, 6)) \
         - tf.multiply(1.45841, tf.pow(__x, 7)) - tf.multiply(2.36991, tf.pow(__x, 8)) - tf.multiply(3.94985, tf.pow(__x, 9))   
 
+def customSQRT3(tensor:tf.Tensor, initGuess:tf.float32, iterations:int) -> tf.Tensor:
+    """
+    Returns element-wise estimated square root using Heron's method, also known as babylonian
+    method.
+    
+    See: https://en.wikipedia.org/wiki/Methods_of_computing_square_roots
+    
+    Args:
+        tensor: tf.Tensor: A tensorflow tensor (All elements should be smaller than 1)
+        initGuess: tf.float32: The initial guess
+        iterations: int: Number of iterations, the higher the higher the accuracy of final results 
+    """
+    __result = initGuess
+    for i in range(iterations):
+        __result = tf.multiply(.5, __result + tf.math.divide_no_nan(tensor, __result))
+        
+    return __result
+
 def iouUtils(boxParams, gridRatio = tf.constant(7, tf.float32)):
     """
     Given bounding box centers and its width and height, calculates top-left and bottom-right coordinates of the box.
